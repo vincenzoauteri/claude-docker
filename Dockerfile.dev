@@ -1,0 +1,81 @@
+# Minimalistic development environment with Go, Node.js, Git, and Vim
+
+FROM ubuntu:24.04
+
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install essential system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    vim \
+    build-essential \
+    ca-certificates \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Go (latest stable version)
+ENV GO_VERSION=1.21.5
+RUN wget -O go.tar.gz "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz" && \
+    tar -C /usr/local -xzf go.tar.gz && \
+    rm go.tar.gz
+
+# Set Go environment
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/go"
+ENV GOROOT="/usr/local/go"
+
+# Create Go directories with proper permissions
+RUN mkdir -p /go/bin /go/pkg /go/src && \
+    chmod -R 755 /go
+
+# Install Node.js 22 LTS
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
+    apt-get install -y nodejs
+
+# Update npm to latest version
+RUN npm install -g npm@latest
+
+RUN npm install -g @anthropic-ai/claude-code
+
+# Create developer user
+RUN useradd -m -s /bin/bash developer && \
+    echo "developer ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    chown -R developer:developer /go
+
+# Fix npm global permissions for developer user
+RUN mkdir -p /home/developer/.npm-global && \
+    chown -R developer:developer /home/developer/.npm-global && \
+    chown -R developer:developer /usr/lib/node_modules || true
+
+# Create workspace directory with proper permissions
+RUN mkdir -p /workspace && \
+    chown -R developer:developer /workspace
+
+# Switch to developer user
+USER developer
+WORKDIR /home/developer
+
+# Configure npm to use user directory for global packages
+RUN npm config set prefix '/home/developer/.npm-global'
+ENV PATH="/home/developer/.npm-global/bin:$PATH"
+
+# Basic Git configuration
+RUN git config --global init.defaultBranch main && \
+    git config --global user.name "Developer" && \
+    git config --global user.email "developer@example.com"
+
+# Copy and set up Vim configuration
+COPY --chown=developer:developer .vimrc /home/developer/.vimrc
+
+# Install only essential Go tools
+RUN go install golang.org/x/tools/cmd/goimports@latest
+
+# Set workspace as working directory
+WORKDIR /workspace
+
+# Default command
+CMD ["/bin/bash"]
