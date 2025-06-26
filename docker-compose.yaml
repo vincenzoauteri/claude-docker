@@ -1,11 +1,9 @@
-version: "3.8"
-
 services:
   dev:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    container_name: dev-environment
+    container_name: devenv
     volumes:
       # Mount your project directory
       - ./workspace:/workspace
@@ -17,6 +15,8 @@ services:
     # Keep container running
     tty: true
     stdin_open: true
+    env_file:
+      - .env
     # Basic environment variables
     environment:
       - GOPROXY=https://proxy.golang.org,direct
